@@ -1,0 +1,116 @@
+version: '3'
+
+services:
+    apache:
+        build: ./images/httpd
+        volumes:
+            - ./www:/var/www/html
+            - ./httpd/httpd.conf:/usr/local/apache2/conf/httpd.conf
+        #ports:
+        #    - "88:80"
+        depends_on:
+            - php
+        networks:
+            - main_network
+    nginx:
+        build: ./images/nginx
+        ports:
+            - "80:80"
+            - "443:443"
+        volumes:
+            - ./hosts/nginx.conf:/etc/nginx/nginx.conf
+            - ./www:/var/www/html
+            - ./logs/nginx:/var/log/nginx
+        depends_on:
+            - apache
+        networks:
+            - main_network
+
+    php:
+        build: ./images/php
+        environment:
+            - MYSQL_HOST=mysql
+            - MYSQL_DATABASE=sait
+            - MYSQL_USER=user
+            - MYSQL_PASSWORD=password
+            - MYSQL_ROOT_PASSWORD=root_password
+        depends_on:
+            -   mysql
+            -   postgresql
+        volumes:
+            - ./www:/var/www/html
+        networks:
+            - main_network
+    mysql:
+        build: ./images/mysql
+        ports:
+            - "3306:3306"
+        volumes:
+            - ./etc/mysql/my.cnf:/etc/mysql/my.cnf
+            - ./logs/mysql:/var/log/mysql
+            - ./db-data/mysql-files:/var/lib/mysql-files
+            - ./db-data/mysql-data:/var/lib/mysql
+            - ./db-data/mysql-migrations:/docker-entrypoint-initdb.d
+        environment:
+            MYSQL_USER: user
+            MYSQL_PASSWORD: password
+            MYSQL_DATABASE: sait
+            MYSQL_ROOT_PASSWORD: root_password
+        networks:
+            - main_network
+
+    phpmyadmin:
+        image: phpmyadmin/phpmyadmin
+        links:
+            - mysql:db
+        ports:
+            - 8765:80
+        environment:
+            MYSQL_ROOT_PASSWORD: root_password
+        depends_on:
+            - mysql
+        networks:
+            - main_network
+
+    postgresql:
+        container_name: postgresql
+        image: postgres
+        ports:
+            - "5432:5432"
+        environment:
+            POSTGRES_USER: user
+            POSTGRES_PASSWORD: password
+            POSTGRES_DB: sait
+        volumes:
+            - ./db-data/postgres-data:/var/lib/postgresql/data
+            - type: bind
+              source: ./db-data/postgres-migrations/001-create-table-users.sql
+              target: /docker-entrypoint-initdb.d/1-create-users.sql
+              read_only: true
+            - type: bind
+              source: ./db-data/postgres-migrations/002-insert-users.sql
+              target: /docker-entrypoint-initdb.d/2-insert-users.sql
+              read_only: true
+        networks:
+            - main_network
+    pgadmin:
+        image: dpage/pgadmin4:latest
+        environment:
+            PGADMIN_DEFAULT_EMAIL: admin@email.com
+            PGADMIN_DEFAULT_PASSWORD: admin_password
+        ports:
+            - "5050:80"
+        volumes:
+            - ./db-data/pgadmin-data:/var/lib/pgadmin
+        depends_on:
+            - postgresql
+        networks:
+            - main_network
+
+networks:
+    main_network:
+        driver: bridge
+
+volumes:
+    dbdata:
+        driver: local

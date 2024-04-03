@@ -1,0 +1,6 @@
+.idea
+db-data/mysql-data
+db-data/mysql-files
+db-data/pgadmin-data
+db-data/postgres-data
+logs
